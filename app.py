@@ -75,6 +75,10 @@ GRAPH_API_VERSION = "v21.0"
 GRAPH_HOST = os.environ.get("GRAPH_HOST", "graph.instagram.com")
 GRAPH_BASE = f"https://{GRAPH_HOST}/{GRAPH_API_VERSION}"
 
+# How long to wait for a media container to finish processing before giving up.
+CONTAINER_POLL_MAX_ATTEMPTS = 15
+CONTAINER_POLL_INTERVAL_SECONDS = 4
+
 
 def _redact_url(url, params):
     """Build the full request URL (query string included) with the access_token
@@ -124,6 +128,43 @@ def create_media_container(ig_user_id, access_token, image_url, caption):
     return resp.json()["id"]
 
 
+def wait_for_container_ready(container_id, access_token):
+    """Poll the container's status_code until it's FINISHED (or ERROR/EXPIRED).
+
+    Instagram processes media asynchronously after /media returns a container
+    id -- publishing before it reports FINISHED fails with error 9007 "Media
+    ID is not available". Images are usually ready within a few seconds.
+    """
+    url = f"{GRAPH_BASE}/{container_id}"
+    params = {"fields": "status_code", "access_token": access_token}
+
+    for attempt in range(1, CONTAINER_POLL_MAX_ATTEMPTS + 1):
+        logger.info(
+            "GET container status (attempt %s/%s) -> %s",
+            attempt, CONTAINER_POLL_MAX_ATTEMPTS, _redact_url(url, params),
+        )
+        resp = requests.get(url, params=params, timeout=30)
+        logger.info("container status response: %s %s", resp.status_code, resp.text)
+
+        if not resp.ok:
+            raise RuntimeError(f"container status check failed: {resp.status_code} {resp.text}")
+
+        status_code = resp.json().get("status_code")
+
+        if status_code == "FINISHED":
+            return
+        if status_code in ("ERROR", "EXPIRED"):
+            raise RuntimeError(f"container processing failed with status_code={status_code}: {resp.text}")
+
+        # IN_PROGRESS or anything else not-yet-terminal: wait and retry.
+        time.sleep(CONTAINER_POLL_INTERVAL_SECONDS)
+
+    raise RuntimeError(
+        f"container {container_id} did not finish processing after "
+        f"{CONTAINER_POLL_MAX_ATTEMPTS * CONTAINER_POLL_INTERVAL_SECONDS}s"
+    )
+
+
 def publish_media_container(ig_user_id, access_token, container_id):
     url = f"{GRAPH_BASE}/{ig_user_id}/media_publish"
     params = {"access_token": access_token}
@@ -166,6 +207,7 @@ def _do_run():
     logger.info("Publishing post id=%s using image_url=%s", post["id"], image_url)
 
     container_id = create_media_container(ig_user_id, access_token, image_url, post["caption"])
+    wait_for_container_ready(container_id, access_token)
     media_id = publish_media_container(ig_user_id, access_token, container_id)
 
     save_rotation_index(idx + 1)
