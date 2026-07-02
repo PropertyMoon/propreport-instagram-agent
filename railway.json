@@ -4,7 +4,6 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    # "startCommand": "gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120",
     "startCommand": "curl -sf \"https://web-production-ig.up.railway.app/run?secret=$RUN_SECRET\"",
     "cronSchedule": "*/5 * * * *",
     "restartPolicyType": "NEVER"
