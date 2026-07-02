@@ -120,11 +120,16 @@ def render_stat(big_number, sub_line, filename, dark_bg=True):
     draw_wrapped(d, sub_line, (72, start_y + num_h + 40), f_sub, sub_color, max_w)
 
     brand_tag(d, dark_bg=dark_bg)
-    img.save(filename)
+    img.save(filename, format="JPEG", quality=92)
 
 
 def render_post(post, out_dir):
-    filename = os.path.join(out_dir, f"{post['id']}.png")
+    # Instagram's content-publishing API has been observed to intermittently
+    # fail with "Media ID is not available" (code 9007) on PNG uploads even
+    # after the container reports status_code=FINISHED. JPEG is the format
+    # Meta's docs/examples use and is more reliably accepted -- render as
+    # JPEG (RGB, no alpha) to avoid this class of error.
+    filename = os.path.join(out_dir, f"{post['id']}.jpg")
     if post["style"] == "dark_statement":
         render_statement(post["headline"], filename, tag=post.get("tag"), dark_bg=True)
     elif post["style"] == "light_statement":

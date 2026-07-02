@@ -20,32 +20,54 @@ what to post next. Add more posts any time by editing that file.
 
 ## 1. Get your Instagram Graph API credentials
 
-You need an Instagram **Business or Creator account** linked to a Facebook
-Page.
+Meta's app dashboard now uses a **Use Cases** model (the old "Add Products" /
+Graph API Explorer flow is deprecated for this purpose). This project is set
+up for the **Instagram Business Login** flow, which does not require linking
+a Facebook Page.
+
+You need an Instagram **Business or Creator account** (Professional account).
 
 1. Go to [developers.facebook.com/apps](https://developers.facebook.com/apps)
-   and create an app (type: "Other" → "Business").
-2. Add the **Instagram Graph API** product to the app.
-3. Make sure your Facebook Page (linked to your Instagram account) is added
-   as an asset of the app.
-4. Use the [Graph API Explorer](https://developers.facebook.com/tools/explorer/)
-   to generate a **User Access Token** with these permissions:
-   `instagram_basic`, `instagram_content_publish`, `pages_show_list`,
-   `pages_read_engagement`.
-5. Exchange the short-lived token for a **long-lived token** (valid ~60 days,
-   renewable) — see
-   [Meta's long-lived token docs](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/postman/access-tokens#long-lived-user-access-tokens).
-6. Get your **Instagram Business Account ID**:
-   - `GET /me/accounts` → get your Facebook Page ID
-   - `GET /{page-id}?fields=instagram_business_account` → get the Instagram
-     Business Account ID
+   and create an app → select **Business** as the app type.
+2. In your app dashboard, open **Use Cases** in the left sidebar and add/select
+   **Instagram Business**.
+3. Click **API setup with Instagram login**.
+4. Under permissions, make sure these are enabled:
+   `instagram_business_basic`, `instagram_business_content_publish`
+   (add `instagram_business_manage_messages` / `instagram_business_manage_comments`
+   only if you plan to use DMs/comments later — not required for posting).
+5. Scroll to the **Generate access tokens** section on that same page and
+   click **Add account**. Log in with the Instagram account for
+   propreport.com.au and authorize the requested permissions.
+6. Generate the token. It will start with `IGAA...` — this is an
+   **Instagram User access token**, valid for **60 days**.
+7. On the same page, note the **Instagram User ID** shown next to your
+   connected account — this is the value to use for `IG_BUSINESS_ACCOUNT_ID`
+   below (despite the variable name, it's your Instagram User ID from this
+   flow, not a Facebook-Page-linked Business Account ID).
+8. Copy the token **directly** from this page into Railway's variable —
+   don't paste it through Notes, Slack, or any other app first. Some apps
+   silently mangle long tokens (smart quotes, hidden line breaks, invisible
+   characters), which causes an "Invalid OAuth access token — Cannot parse
+   access token" error even though the value looks correct visually.
 
-You'll end up with two values: `IG_ACCESS_TOKEN` and
-`IG_BUSINESS_ACCOUNT_ID`.
+You'll end up with two values: `IG_ACCESS_TOKEN` (the `IGAA...` token) and
+`IG_BUSINESS_ACCOUNT_ID` (the Instagram User ID from step 7).
 
-**Note:** long-lived tokens expire after ~60 days. You'll need to refresh it
-periodically (Meta allows refreshing before expiry via
-`GET /refresh_access_token`) and update the Railway environment variable.
+**Important — API host:** tokens from this Instagram Business Login flow
+(`IGAA...`) only work against the `graph.instagram.com` host, not
+`graph.facebook.com`. This app defaults `GRAPH_HOST` to `graph.instagram.com`
+already. If you instead generated an `EAA...` token via the older Facebook
+Login for Business flow (Instagram linked through a Facebook Page), set the
+Railway env var `GRAPH_HOST=graph.facebook.com` to match.
+
+**Note:** long-lived tokens expire after ~60 days. Refresh with:
+```
+GET https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=<current long-lived token>
+```
+and update the Railway environment variable with the new token before day 60
+(tokens not refreshed within 60 days of issue can no longer be refreshed and
+must be regenerated from scratch).
 
 ---
 
@@ -70,10 +92,11 @@ In the Railway project → your service → **Variables**, add:
 
 | Variable | Value |
 |---|---|
-| `IG_ACCESS_TOKEN` | the long-lived token from step 1 |
-| `IG_BUSINESS_ACCOUNT_ID` | the numeric ID from step 1 |
+| `IG_ACCESS_TOKEN` | the `IGAA...` long-lived token from step 1 |
+| `IG_BUSINESS_ACCOUNT_ID` | the Instagram User ID from step 1 |
 | `PUBLIC_BASE_URL` | the Railway domain from step 2 (no trailing slash) |
 | `RUN_SECRET` | any random string you make up, e.g. `openssl rand -hex 16` |
+| `GRAPH_HOST` | optional — only set if using an `EAA...` Facebook-Login token instead; value `graph.facebook.com`. Leave unset for `IGAA...` tokens (defaults to `graph.instagram.com`). |
 
 Redeploy after saving (Railway usually does this automatically).
 
@@ -81,7 +104,21 @@ Redeploy after saving (Railway usually does this automatically).
 
 ## 4. Test it manually
 
-Visit in your browser (or curl):
+Before posting for real, verify the token/ID are wired up correctly with the
+diagnostic endpoint (does not post anything):
+
+```
+https://<your-railway-domain>/debug-token?secret=<your RUN_SECRET>
+```
+
+This calls `GET /{IG_BUSINESS_ACCOUNT_ID}?fields=username` against Graph API
+using your env vars and returns the raw response, plus the token's length and
+first/last few characters (never the full token) so you can sanity-check it
+matches what you generated in Meta's dashboard. If this returns your
+Instagram username, the credentials are good and any remaining error is in
+the posting step itself, not auth.
+
+Then test the real posting flow. Visit in your browser (or curl):
 
 ```
 https://<your-railway-domain>/run?secret=<your RUN_SECRET>
@@ -95,6 +132,17 @@ If it works, you'll get a JSON response like:
 
 And the post will appear on your Instagram account within a few seconds.
 Check `/` for a basic health check any time.
+
+**Note on `access_token` placement:** the app sends `access_token` as a query
+parameter on every request (not as a POST body field). `graph.instagram.com`
+has been observed to return `"Cannot parse access token"` for a perfectly
+valid token when it's only included in the POST body on some endpoints/API
+versions — sending it as a query param avoids that.
+
+**Logs:** every outgoing request URL (with the token redacted) and the raw
+Graph API response are logged via Python's `logging` module, viewable in
+Railway's **Deployments → Logs** tab. Useful for debugging without exposing
+your token.
 
 ---
 
@@ -158,3 +206,36 @@ Each entry needs a unique `id` and a `caption` (the Instagram caption text).
 - The `/run` endpoint is protected by `RUN_SECRET`. Keep it private.
 - Long-lived Instagram tokens expire ~60 days after issue — set a reminder to
   refresh it.
+
+## Troubleshooting: "Media ID is not available" (code 9007)
+
+If `/run` fails with an error like:
+
+```
+publish_media_container failed: 400 {"error":{"message":"Media ID is not
+available","code":9007,"error_subcode":2207027,...}}
+```
+
+this means Instagram's container-status endpoint reported the media as
+`FINISHED`, but the publish endpoint still wasn't ready for it. Two things
+address this:
+
+1. **Images are now rendered as JPEG, not PNG.** Meta's content-publishing
+   API has documented reliability issues with PNG uploads that manifest as
+   exactly this error, even when the container reports `FINISHED`. `render.py`
+   now saves `.jpg` files and `app.py` builds image URLs accordingly — no
+   action needed, this is already applied.
+2. **A minimum wait + automatic retry around publish.** `status_code` can
+   report `FINISHED` in under a second while the publish endpoint is still
+   catching up (an eventual-consistency gap on Meta's side). The app now:
+   - Waits at least `MIN_SECONDS_BEFORE_PUBLISH` (default 5s) after container
+     creation before calling publish, even if `FINISHED` shows up instantly.
+   - If publish still returns the 9007/2207027 error, retries the publish
+     call up to `PUBLISH_RETRY_ATTEMPTS` times (default 4) with a
+     `PUBLISH_RETRY_BACKOFF_SECONDS` delay (default 5s) between attempts.
+   - Any other error type fails immediately without retrying.
+
+If you still see this error after all retries are exhausted, it's most
+likely a temporary Meta-side platform issue (this exact error has been
+reported as a Meta-side outage affecting multiple third-party apps at once) —
+simply trigger `/run` again in a few minutes.

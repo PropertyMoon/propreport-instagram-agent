@@ -79,6 +79,23 @@ GRAPH_BASE = f"https://{GRAPH_HOST}/{GRAPH_API_VERSION}"
 CONTAINER_POLL_MAX_ATTEMPTS = 15
 CONTAINER_POLL_INTERVAL_SECONDS = 4
 
+# Instagram's container status_code has been observed to report FINISHED
+# almost instantly (sub-second) while media_publish still rejects the
+# creation_id with "Media ID is not available" (code 9007 / 2207027) a
+# moment later. This appears to be Meta-side eventual consistency between
+# the status endpoint and the publish endpoint, not something client-side
+# polling alone can detect. As a buffer, always wait a minimum amount of
+# time after container creation before attempting to publish, regardless
+# of how fast status_code reports FINISHED.
+MIN_SECONDS_BEFORE_PUBLISH = 5
+
+# If publish still fails with the transient "Media ID is not available"
+# error after the status check passed, retry the publish call itself a
+# few times with a short backoff -- this is a documented, sometimes
+# purely Meta-side transient condition that commonly succeeds on retry.
+PUBLISH_RETRY_ATTEMPTS = 4
+PUBLISH_RETRY_BACKOFF_SECONDS = 5
+
 
 def _redact_url(url, params):
     """Build the full request URL (query string included) with the access_token
@@ -134,9 +151,17 @@ def wait_for_container_ready(container_id, access_token):
     Instagram processes media asynchronously after /media returns a container
     id -- publishing before it reports FINISHED fails with error 9007 "Media
     ID is not available". Images are usually ready within a few seconds.
+
+    Also enforces MIN_SECONDS_BEFORE_PUBLISH: status_code has been observed
+    to report FINISHED in well under a second, but media_publish can still
+    reject the same container moments later with the identical 9007 error --
+    Meta's status endpoint and publish endpoint appear to become consistent
+    on slightly different timelines. Waiting a small minimum amount of time
+    regardless of how fast FINISHED shows up gives that a chance to settle.
     """
     url = f"{GRAPH_BASE}/{container_id}"
     params = {"fields": "status_code", "access_token": access_token}
+    started_at = time.monotonic()
 
     for attempt in range(1, CONTAINER_POLL_MAX_ATTEMPTS + 1):
         logger.info(
@@ -152,6 +177,15 @@ def wait_for_container_ready(container_id, access_token):
         status_code = resp.json().get("status_code")
 
         if status_code == "FINISHED":
+            elapsed = time.monotonic() - started_at
+            remaining = MIN_SECONDS_BEFORE_PUBLISH - elapsed
+            if remaining > 0:
+                logger.info(
+                    "status_code=FINISHED after %.2fs (suspiciously fast); "
+                    "waiting %.2fs more before publish as a buffer",
+                    elapsed, remaining,
+                )
+                time.sleep(remaining)
             return
         if status_code in ("ERROR", "EXPIRED"):
             raise RuntimeError(f"container processing failed with status_code={status_code}: {resp.text}")
@@ -165,22 +199,56 @@ def wait_for_container_ready(container_id, access_token):
     )
 
 
+def _is_media_not_ready_error(resp):
+    """True if the response body is Meta's transient 'Media ID is not
+    available' / 'not ready for publishing' error (code 9007, subcode
+    2207027). This is documented across multiple third-party integrations
+    as sometimes purely Meta-side and transient -- retrying the publish
+    call after a short delay commonly succeeds."""
+    try:
+        err = resp.json().get("error", {})
+    except ValueError:
+        return False
+    return err.get("code") == 9007 or err.get("error_subcode") == 2207027
+
+
 def publish_media_container(ig_user_id, access_token, container_id):
     url = f"{GRAPH_BASE}/{ig_user_id}/media_publish"
     params = {"access_token": access_token}
-    logger.info("POST publish_media_container -> %s", _redact_url(url, params))
-    resp = requests.post(
-        url,
-        params=params,
-        data={
-            "creation_id": container_id,
-        },
-        timeout=60,
-    )
-    logger.info("publish_media_container response: %s %s", resp.status_code, resp.text)
-    if not resp.ok:
-        raise RuntimeError(f"publish_media_container failed: {resp.status_code} {resp.text}")
-    return resp.json()["id"]
+
+    last_resp = None
+    for attempt in range(1, PUBLISH_RETRY_ATTEMPTS + 1):
+        logger.info(
+            "POST publish_media_container (attempt %s/%s) -> %s",
+            attempt, PUBLISH_RETRY_ATTEMPTS, _redact_url(url, params),
+        )
+        resp = requests.post(
+            url,
+            params=params,
+            data={
+                "creation_id": container_id,
+            },
+            timeout=60,
+        )
+        logger.info("publish_media_container response: %s %s", resp.status_code, resp.text)
+
+        if resp.ok:
+            return resp.json()["id"]
+
+        last_resp = resp
+        if _is_media_not_ready_error(resp) and attempt < PUBLISH_RETRY_ATTEMPTS:
+            logger.info(
+                "Transient 'Media ID is not available' error on attempt %s/%s; "
+                "retrying in %ss",
+                attempt, PUBLISH_RETRY_ATTEMPTS, PUBLISH_RETRY_BACKOFF_SECONDS,
+            )
+            time.sleep(PUBLISH_RETRY_BACKOFF_SECONDS)
+            continue
+
+        # Not the transient error, or out of retries: fail now.
+        break
+
+    raise RuntimeError(f"publish_media_container failed: {last_resp.status_code} {last_resp.text}")
 
 
 @app.route("/")
