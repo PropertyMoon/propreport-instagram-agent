@@ -13,6 +13,9 @@ Runs as a small Flask web service on Railway:
 - GET  /debug-token      diagnostic endpoint: verifies IG_ACCESS_TOKEN /
                           IG_BUSINESS_ACCOUNT_ID work against Graph API without
                           posting anything.
+- GET  /status           read-only view of rotation state: posts remaining,
+                          estimated days of content left, whether alerts have
+                          already fired. Does not post anything.
 
 Required environment variables (set these in the Railway dashboard -> Variables,
 never commit them to the repo):
@@ -35,6 +38,32 @@ never commit them to the repo):
                            on manual GET /run calls and used by the cron job,
                            so randos on the internet can't trigger posts.
 
+Optional environment variables (content rotation + low-content email alerts):
+
+  POSTS_PER_WEEK          How many times/week the cron job posts. Default 3.
+                           Used only to convert "days of content left" into a
+                           post count for the low-content alert.
+  LOW_CONTENT_ALERT_DAYS  Send an email alert once remaining unposted content
+                           drops to this many days' worth (based on
+                           POSTS_PER_WEEK). Default 2.
+  ALERT_EMAIL_TO          Email address to send low-content / out-of-content
+                           alerts to. If unset, alerting is disabled (the app
+                           still stops posting at the end of rotation either way).
+  SMTP_HOST, SMTP_PORT,
+  SMTP_USERNAME,
+  SMTP_PASSWORD,
+  SMTP_FROM               SMTP credentials used to send the alert email.
+                           Works with a Gmail app password (smtp.gmail.com,
+                           port 587) or any transactional email provider's
+                           SMTP endpoint. SMTP_FROM defaults to SMTP_USERNAME.
+
+Rotation behavior: posts are published in order (p01, p02, ...) and do NOT
+loop back to the start. Once the last post has been published, /run returns
+an "out of content" response and does not post anything until you add more
+entries to content_library.py. An email alert (if ALERT_EMAIL_TO is set) is
+sent once when remaining content drops to LOW_CONTENT_ALERT_DAYS worth, and
+again when content is fully exhausted.
+
 Local test:
   pip install -r requirements.txt
   export IG_ACCESS_TOKEN=... IG_BUSINESS_ACCOUNT_ID=... PUBLIC_BASE_URL=http://localhost:8080 RUN_SECRET=test
@@ -43,8 +72,11 @@ Local test:
 """
 import json
 import logging
+import math
 import os
+import smtplib
 import time
+from email.mime.text import MIMEText
 
 from flask import Flask, send_from_directory, jsonify, request
 import requests
@@ -79,6 +111,22 @@ GRAPH_BASE = f"https://{GRAPH_HOST}/{GRAPH_API_VERSION}"
 CONTAINER_POLL_MAX_ATTEMPTS = 15
 CONTAINER_POLL_INTERVAL_SECONDS = 4
 
+# --- Content rotation + low-content alerting config ---
+# Posting cadence, used only to convert "days of content left" to a post count.
+POSTS_PER_WEEK = float(os.environ.get("POSTS_PER_WEEK", "3"))
+POSTS_PER_DAY = POSTS_PER_WEEK / 7.0
+
+# Send an email alert once remaining unposted content drops to this many
+# days' worth (at the configured posting cadence).
+LOW_CONTENT_ALERT_DAYS = float(os.environ.get("LOW_CONTENT_ALERT_DAYS", "2"))
+
+ALERT_EMAIL_TO = os.environ.get("ALERT_EMAIL_TO", "")
+SMTP_HOST = os.environ.get("SMTP_HOST", "")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USERNAME)
+
 # Instagram's container status_code has been observed to report FINISHED
 # almost instantly (sub-second) while media_publish still rejects the
 # creation_id with "Media ID is not available" (code 9007 / 2207027) a
@@ -108,19 +156,59 @@ def _redact_url(url, params):
     return f"{url}?{query}" if query else url
 
 
-def load_rotation_index():
+def load_rotation_state():
+    """Returns a dict with next_index (int) and alerted (list of alert names
+    already sent, so we don't email the same alert every run)."""
+    default = {"next_index": 0, "alerted": []}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
-                return json.load(f).get("next_index", 0)
+                data = json.load(f)
+                return {
+                    "next_index": data.get("next_index", 0),
+                    "alerted": data.get("alerted", []),
+                }
         except (json.JSONDecodeError, OSError):
-            return 0
-    return 0
+            return default
+    return default
 
 
-def save_rotation_index(idx):
+def save_rotation_state(idx, alerted):
     with open(STATE_FILE, "w") as f:
-        json.dump({"next_index": idx, "updated_at": time.time()}, f)
+        json.dump(
+            {"next_index": idx, "alerted": alerted, "updated_at": time.time()},
+            f,
+        )
+
+
+def send_alert_email(subject, body):
+    """Best-effort email alert via SMTP. Silently no-ops (with a log line) if
+    ALERT_EMAIL_TO or SMTP credentials aren't configured, and never raises --
+    a failed alert email should never break the posting run itself."""
+    if not ALERT_EMAIL_TO:
+        logger.info("send_alert_email skipped (ALERT_EMAIL_TO not set): %s", subject)
+        return
+    if not (SMTP_HOST and SMTP_USERNAME and SMTP_PASSWORD):
+        logger.warning(
+            "send_alert_email skipped (SMTP_HOST/SMTP_USERNAME/SMTP_PASSWORD not "
+            "fully configured): %s",
+            subject,
+        )
+        return
+
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = SMTP_FROM or SMTP_USERNAME
+    msg["To"] = ALERT_EMAIL_TO
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.sendmail(msg["From"], [ALERT_EMAIL_TO], msg.as_string())
+        logger.info("Sent alert email to %s: %s", ALERT_EMAIL_TO, subject)
+    except Exception:
+        logger.exception("Failed to send alert email: %s", subject)
 
 
 def create_media_container(ig_user_id, access_token, image_url, caption):
@@ -261,13 +349,76 @@ def serve_image(filename):
     return send_from_directory(GENERATED_DIR, filename)
 
 
+def _maybe_send_low_content_alert(state, remaining_after_this_post):
+    """Fires the low-content email alert once when remaining posts drop to
+    LOW_CONTENT_ALERT_DAYS worth (at POSTS_PER_WEEK cadence), and never again
+    until the state file's 'alerted' list is reset (e.g. after adding more
+    content and manually clearing rotation_state.json, or it naturally
+    resets once you add posts and the count rises back above threshold is
+    not tracked -- simplest mental model: it fires once per depletion cycle).
+    """
+    # Round up so "N days worth" always means at least enough posts to cover
+    # that many days -- e.g. at 3 posts/week, 2 days worth is <1 post
+    # mathematically, but the alert should still fire with 1 post left, not
+    # never fire at all.
+    threshold_posts = max(1, math.ceil(LOW_CONTENT_ALERT_DAYS * POSTS_PER_DAY))
+    alerted = set(state.get("alerted", []))
+
+    if remaining_after_this_post <= 0:
+        return alerted  # handled separately as the "out of content" alert
+
+    if remaining_after_this_post <= threshold_posts and "low_content" not in alerted:
+        days_left = remaining_after_this_post / POSTS_PER_DAY if POSTS_PER_DAY > 0 else 0
+        send_alert_email(
+            subject="PropReport Instagram: running low on content",
+            body=(
+                f"Only {remaining_after_this_post} unposted post(s) left in "
+                f"content_library.py -- about {days_left:.1f} day(s) worth at "
+                f"{POSTS_PER_WEEK:g} posts/week.\n\n"
+                "Add more entries to content_library.py before the queue runs "
+                "out, otherwise posting will stop automatically once the last "
+                "post is published."
+            ),
+        )
+        alerted.add("low_content")
+
+    return alerted
+
+
 def _do_run():
     access_token = os.environ["IG_ACCESS_TOKEN"]
     ig_user_id = os.environ["IG_BUSINESS_ACCOUNT_ID"]
     public_base_url = os.environ["PUBLIC_BASE_URL"].rstrip("/")
 
-    idx = load_rotation_index()
-    post = POSTS[idx % len(POSTS)]
+    state = load_rotation_state()
+    idx = state["next_index"]
+
+    if idx >= len(POSTS):
+        # Rotation is exhausted -- do NOT loop back to post 1. Alert once per
+        # depletion cycle instead of every single run.
+        alerted = set(state.get("alerted", []))
+        if "out_of_content" not in alerted:
+            send_alert_email(
+                subject="PropReport Instagram: out of content -- posting stopped",
+                body=(
+                    "All posts in content_library.py have been published. "
+                    "No new posts will be published until you add more entries "
+                    "and the app is redeployed.\n\n"
+                    "Once you've added more content, reset rotation_state.json "
+                    "(or delete it) if you want the new posts to start from the "
+                    "top, or leave it as-is to continue appending new posts "
+                    "after the existing ones."
+                ),
+            )
+            alerted.add("out_of_content")
+            save_rotation_state(idx, sorted(alerted))
+        return {
+            "posted": None,
+            "out_of_content": True,
+            "next_index": idx,
+        }
+
+    post = POSTS[idx]
 
     image_path = render_post(post, GENERATED_DIR)
     image_filename = os.path.basename(image_path)
@@ -278,13 +429,17 @@ def _do_run():
     wait_for_container_ready(container_id, access_token)
     media_id = publish_media_container(ig_user_id, access_token, container_id)
 
-    save_rotation_index(idx + 1)
+    new_idx = idx + 1
+    remaining = len(POSTS) - new_idx
+    alerted = _maybe_send_low_content_alert(state, remaining)
+    save_rotation_state(new_idx, sorted(alerted))
 
     return {
         "posted": post["id"],
         "media_id": media_id,
         "image_url": image_url,
-        "next_index": (idx + 1) % len(POSTS),
+        "next_index": new_idx,
+        "posts_remaining": remaining,
     }
 
 
@@ -331,6 +486,35 @@ def debug_token():
         "token_suffix": access_token[-4:] if access_token else None,
         "status_code": resp.status_code,
         "response": resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text,
+    })
+
+
+@app.route("/status")
+def status():
+    """Read-only view of rotation state: how many posts remain, whether
+    alerts have fired, and current alerting config. Does not post anything.
+    Protected by RUN_SECRET like /run.
+    """
+    expected_secret = os.environ.get("RUN_SECRET")
+    provided_secret = request.args.get("secret") or request.headers.get("X-Run-Secret")
+    if expected_secret and provided_secret != expected_secret:
+        return jsonify({"error": "unauthorized"}), 401
+
+    state = load_rotation_state()
+    idx = state["next_index"]
+    remaining = max(len(POSTS) - idx, 0)
+    days_left = remaining / POSTS_PER_DAY if POSTS_PER_DAY > 0 else None
+
+    return jsonify({
+        "total_posts": len(POSTS),
+        "next_index": idx,
+        "posts_remaining": remaining,
+        "days_remaining_estimate": round(days_left, 1) if days_left is not None else None,
+        "posts_per_week": POSTS_PER_WEEK,
+        "low_content_alert_days": LOW_CONTENT_ALERT_DAYS,
+        "out_of_content": remaining == 0,
+        "alerts_sent": state.get("alerted", []),
+        "alert_email_configured": bool(ALERT_EMAIL_TO and SMTP_HOST and SMTP_USERNAME and SMTP_PASSWORD),
     })
 
 

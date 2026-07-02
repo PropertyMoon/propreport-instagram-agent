@@ -98,6 +98,34 @@ In the Railway project → your service → **Variables**, add:
 | `RUN_SECRET` | any random string you make up, e.g. `openssl rand -hex 16` |
 | `GRAPH_HOST` | optional — only set if using an `EAA...` Facebook-Login token instead; value `graph.facebook.com`. Leave unset for `IGAA...` tokens (defaults to `graph.instagram.com`). |
 
+Optional — low-content email alerts (see "Content rotation & running low on
+content" below for full behavior):
+
+| Variable | Value |
+|---|---|
+| `ALERT_EMAIL_TO` | your email address, e.g. `siddhartha.sachdev@gmail.com` |
+| `SMTP_HOST` | e.g. `smtp.gmail.com` |
+| `SMTP_PORT` | `587` (default if unset) |
+| `SMTP_USERNAME` | your email address (for Gmail, the account you're sending from) |
+| `SMTP_PASSWORD` | an **app password**, not your normal Gmail password — see below |
+| `SMTP_FROM` | optional, defaults to `SMTP_USERNAME` |
+| `POSTS_PER_WEEK` | how many times/week the cron posts, e.g. `3` (default) |
+| `LOW_CONTENT_ALERT_DAYS` | send the alert once this many days' worth of posts remain, e.g. `2` (default) |
+
+**Using Gmail for SMTP_HOST/SMTP_USERNAME/SMTP_PASSWORD:** Gmail requires an
+app password, not your regular password. In your Google Account go to
+**Security → 2-Step Verification → App passwords**, generate one for "Mail",
+and use that 16-character value as `SMTP_PASSWORD`. `SMTP_HOST` is
+`smtp.gmail.com`, `SMTP_PORT` is `587`.
+
+If you'd rather use a transactional email service (SendGrid, Postmark, etc.)
+instead of Gmail, use that provider's SMTP host/username/password instead —
+the app doesn't care which SMTP server you point it at.
+
+If `ALERT_EMAIL_TO` is left unset, email alerts are simply skipped (logged
+but not sent) — the app will still stop posting at the end of the rotation
+either way, alerts are just for your awareness.
+
 Redeploy after saving (Railway usually does this automatically).
 
 ---
@@ -198,6 +226,35 @@ supported styles:
 - `stat` — a large number/figure with a supporting line underneath.
 
 Each entry needs a unique `id` and a `caption` (the Instagram caption text).
+
+## Content rotation & running low on content
+
+Posts are published in order (`p01`, `p02`, ... in whatever order they appear
+in `POSTS`) and progress is tracked in `rotation_state.json` (auto-created on
+Railway's persistent filesystem). Unlike earlier versions of this app,
+**rotation does NOT loop back to the start** once it reaches the end.
+
+- While posts remain: `/run` renders and publishes the next post as usual.
+- When remaining posts drop to `LOW_CONTENT_ALERT_DAYS` worth (based on
+  `POSTS_PER_WEEK`, default 2 days at 3 posts/week → alerts with 1 post
+  left): if `ALERT_EMAIL_TO` and the `SMTP_*` variables are set, you get one
+  email warning you to add more content. It only fires once per depletion
+  cycle, not on every run.
+- When the last post has been published: `/run` stops posting and returns
+  `{"success": true, "out_of_content": true, ...}` instead of an error. You
+  also get a second, separate "out of content" email (if alerts are
+  configured). Every subsequent `/run` call is a safe no-op until you add
+  more content — it won't loop back to `p01` or throw errors.
+- Check `GET /status?secret=<RUN_SECRET>` any time to see posts remaining,
+  an estimated days-remaining figure, and which alerts have already fired —
+  without posting anything.
+
+**To resume after running out:** add new entries to `content_library.py` and
+redeploy. New posts are appended after the existing ones by index, so
+rotation picks up right where it left off (post 13, 14, ...) — you don't
+need to touch `rotation_state.json`. If you'd instead like to restart from
+the top of the (now-updated) list, delete `rotation_state.json` before or
+after redeploying so `next_index` resets to 0.
 
 ## Security notes
 
