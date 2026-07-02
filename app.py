@@ -40,9 +40,11 @@ never commit them to the repo):
 
 Optional environment variables (content rotation + low-content email alerts):
 
-  POSTS_PER_WEEK          How many times/week the cron job posts. Default 3.
-                           Used only to convert "days of content left" into a
-                           post count for the low-content alert.
+  POSTS_PER_WEEK          How many times/week the cron job posts. Default 7
+                           (daily). Used only to convert "days of content
+                           left" into a post count for the low-content alert
+                           -- update this if you change the cron schedule so
+                           the alert timing stays accurate.
   LOW_CONTENT_ALERT_DAYS  Send an email alert once remaining unposted content
                            drops to this many days' worth (based on
                            POSTS_PER_WEEK). Default 2.
@@ -113,7 +115,7 @@ CONTAINER_POLL_INTERVAL_SECONDS = 4
 
 # --- Content rotation + low-content alerting config ---
 # Posting cadence, used only to convert "days of content left" to a post count.
-POSTS_PER_WEEK = float(os.environ.get("POSTS_PER_WEEK", "3"))
+POSTS_PER_WEEK = float(os.environ.get("POSTS_PER_WEEK", "7"))
 POSTS_PER_DAY = POSTS_PER_WEEK / 7.0
 
 # Send an email alert once remaining unposted content drops to this many

@@ -10,11 +10,19 @@ The app is a small Flask web service with two jobs:
    public `image_url`, it can't accept a direct file upload).
 2. Expose a `/run` endpoint that renders the next post in the rotation and
    publishes it to Instagram. Railway's Cron Schedule feature calls this
-   endpoint on your chosen cadence (e.g. Mon/Wed/Fri).
+   endpoint on your chosen cadence (default: daily).
 
-The rotation advances automatically and loops back to the start once it
-reaches the end of `content_library.py` — so you never need to manually pick
-what to post next. Add more posts any time by editing that file.
+Posts are rendered at **1080x1350 (4:5 portrait)** — Instagram's current
+recommended feed format. Earlier versions of this app used a 1:1 square
+canvas, but Instagram's profile grid now crops all thumbnails to a 3:4 shape
+regardless of upload ratio, which cut off the left/right edges of square
+posts in the grid view. 4:5 only loses a small sliver off the top/bottom in
+that grid crop instead of the sides.
+
+The rotation advances automatically through `content_library.py` in order
+and **does not loop back to the start** once it reaches the end — see
+"Content rotation & running low on content" below. Add more posts any time
+by editing that file.
 
 ---
 
@@ -109,7 +117,7 @@ content" below for full behavior):
 | `SMTP_USERNAME` | your email address (for Gmail, the account you're sending from) |
 | `SMTP_PASSWORD` | an **app password**, not your normal Gmail password — see below |
 | `SMTP_FROM` | optional, defaults to `SMTP_USERNAME` |
-| `POSTS_PER_WEEK` | how many times/week the cron posts, e.g. `3` (default) |
+| `POSTS_PER_WEEK` | how many times/week the cron posts, e.g. `7` (default — daily) |
 | `LOW_CONTENT_ALERT_DAYS` | send the alert once this many days' worth of posts remain, e.g. `2` (default) |
 
 **Using Gmail for SMTP_HOST/SMTP_USERNAME/SMTP_PASSWORD:** Gmail requires an
@@ -174,19 +182,20 @@ your token.
 
 ---
 
-## 5. Set up the recurring schedule (3x/week)
+## 5. Set up the recurring schedule (daily)
 
 Railway has a built-in **Cron Schedule** feature for services:
 
 1. In your Railway service → **Settings** → **Cron Schedule**.
-2. Enable it and set a cron expression. For Mon/Wed/Fri at 9am AEST
-   (Melbourne, UTC+10 / UTC+11 during DST — adjust for daylight saving):
+2. Enable it and set a cron expression. For daily at 9am Melbourne time:
    ```
-   0 22 * * 0,2,4
+   0 23 * * *
    ```
-   (22:00 UTC Sun/Tue/Thu = ~9am Mon/Wed/Fri AEDT — double check the current
-   UTC offset for Melbourne when daylight saving changes, and adjust the hour
-   accordingly.)
+   (23:00 UTC = 9am AEST, the UTC+10 offset Melbourne uses outside daylight
+   saving, e.g. April–September. During AEDT/daylight saving, UTC+11—roughly
+   October–April—use `0 22 * * *` instead so it still lands at 9am local
+   time. Update the cron expression when daylight saving changes if you want
+   the posting time to stay fixed at 9am local.)
 3. Point the cron job at the `/run?secret=<RUN_SECRET>` endpoint. If Railway's
    cron feature runs a command rather than hitting a URL in your plan, use a
    tiny curl command as the cron command instead:
@@ -197,8 +206,14 @@ Railway has a built-in **Cron Schedule** feature for services:
 If your Railway plan's Cron Schedule triggers a full redeploy/run of the
 service rather than hitting an existing running service, an easy alternative
 is any free external scheduler (e.g. [cron-job.org](https://cron-job.org)) set
-to hit your `/run?secret=...` URL 3x/week — the app doesn't care who calls it,
-only that the secret matches.
+to hit your `/run?secret=...` URL once a day — the app doesn't care who calls
+it, only that the secret matches.
+
+**Note on content runway at daily cadence:** with 12 posts in
+`content_library.py` and daily posting, the full library lasts 12 days
+before rotation stops (see "Content rotation & running low on content"
+below). Add more posts well before then, or expect (and welcome) the
+low-content email alert as your cue to top up the queue.
 
 ---
 
@@ -206,7 +221,7 @@ only that the secret matches.
 
 ```
 app.py               Flask app: image serving + /run publish endpoint
-render.py             Draws the 1080x1080 branded graphics
+render.py             Draws the 1080x1350 (4:5) branded graphics
 content_library.py    All post content (headline/caption/style) — edit to add more posts
 fonts/                Inter font files used for rendering
 generated/            Output images get written here at runtime
@@ -236,7 +251,7 @@ Railway's persistent filesystem). Unlike earlier versions of this app,
 
 - While posts remain: `/run` renders and publishes the next post as usual.
 - When remaining posts drop to `LOW_CONTENT_ALERT_DAYS` worth (based on
-  `POSTS_PER_WEEK`, default 2 days at 3 posts/week → alerts with 1 post
+  `POSTS_PER_WEEK`, default 2 days at 7 posts/week → alerts with 2 posts
   left): if `ALERT_EMAIL_TO` and the `SMTP_*` variables are set, you get one
   email warning you to add more content. It only fires once per depletion
   cycle, not on every run.

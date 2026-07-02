@@ -1,13 +1,22 @@
 """
 Dan-Koe-style card renderer for PropReport Instagram posts.
-1080x1080, minimalist, alternating dark/light backgrounds, bold statements.
+1080x1350 (4:5 portrait), minimalist, alternating dark/light backgrounds,
+bold statements.
+
+Instagram's profile grid now crops thumbnails to a 3:4 shape regardless of
+the uploaded post's aspect ratio. A true 1:1 square post loses its left/right
+edges in that grid crop. 4:5 (1080x1350) is Instagram's current recommended
+feed format -- it only loses a small sliver off the top/bottom in the grid
+crop (instead of the sides), and it takes up more vertical space in the main
+scrolling feed.
 """
 from PIL import Image, ImageDraw, ImageFont
 import os
 
 FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 
-W = H = 1080
+W = 1080
+H = 1350
 BG_LIGHT = (247, 246, 242)
 TEXT_DARK = (26, 25, 22)
 BG_DARK = (23, 22, 20)
@@ -94,7 +103,7 @@ def render_statement(headline, filename, tag=None, dark_bg=True):
         d.text((72, start_y - 70), tag.upper(), font=f_tag, fill=tag_color)
 
     brand_tag(d, dark_bg=dark_bg)
-    img.save(filename)
+    img.save(filename, format="JPEG", quality=92)
 
 
 def render_stat(big_number, sub_line, filename, dark_bg=True):
@@ -107,17 +116,24 @@ def render_stat(big_number, sub_line, filename, dark_bg=True):
 
     f_num = font("InterDisplay-Black.ttf", 220)
     bbox = d.textbbox((0, 0), big_number, font=f_num)
-    num_h = bbox[3] - bbox[1]
+    # bbox[1] is the gap between the text draw origin and where the glyph ink
+    # actually starts (ascent padding) -- must offset the draw origin upward
+    # by bbox[1] so the visual top of the number lands at start_y, otherwise
+    # everything below (including the gap to sub_line) is measured wrong and
+    # the sub_line ends up overlapping the number's descenders.
+    num_ink_top = bbox[1]
+    num_ink_h = bbox[3] - bbox[1]
 
     f_sub = font("Inter-Medium.ttf", 42)
     max_w = W - 144
     sub_h = measure_wrapped_height(sub_line, f_sub, max_w)
 
-    total_h = num_h + 40 + sub_h
+    gap = 56
+    total_h = num_ink_h + gap + sub_h
     start_y = (H - total_h) / 2 - 40
 
-    d.text((72, start_y), big_number, font=f_num, fill=fg)
-    draw_wrapped(d, sub_line, (72, start_y + num_h + 40), f_sub, sub_color, max_w)
+    d.text((72, start_y - num_ink_top), big_number, font=f_num, fill=fg)
+    draw_wrapped(d, sub_line, (72, start_y + num_ink_h + gap), f_sub, sub_color, max_w)
 
     brand_tag(d, dark_bg=dark_bg)
     img.save(filename, format="JPEG", quality=92)
