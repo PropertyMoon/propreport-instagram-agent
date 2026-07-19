@@ -159,4 +159,129 @@ POSTS = [
             "propreport.com.au"
         ),
     },
+    {
+        "id": "p13",
+        "style": "dark_statement",
+        "tag": "Property Truths",
+        "headline": "A high rental yield and high capital growth\nrarely live in the same suburb.",
+        "caption": (
+            "Investors chase yield.\n\n"
+            "Homeowners chase growth.\n\n"
+            "Few suburbs deliver both at once — know which trade-off you're making before you buy.\n\n"
+            "propreport.com.au"
+        ),
+    },
+    {
+        "id": "p14",
+        "style": "light_statement",
+        "tag": "Risk Check",
+        "headline": "No listing history means\nno comparable sales to check it against.",
+        "caption": (
+            "Off-market feels exclusive.\n\n"
+            "It also means the price was never tested by other buyers.\n\n"
+            "Run the comparables yourself before you trust the exclusivity.\n\n"
+            "propreport.com.au"
+        ),
+    },
+    {
+        "id": "p15",
+        "style": "stat",
+        "tag": None,
+        "big_number": "1%",
+        "sub_line": "vacancy rate is the line between a landlord's market and a tenant's market.",
+        "dark_bg": True,
+        "caption": (
+            "Below 1% vacancy, tenants compete for you.\n\n"
+            "Above 3%, you compete for tenants.\n\n"
+            "Check the number before you buy for yield.\n\n"
+            "propreport.com.au"
+        ),
+    },
+    {
+        "id": "p16",
+        "style": "dark_statement",
+        "tag": "Property Truths",
+        "headline": "Waiting for the 'right' rate\nhas cost more buyers than the rate itself.",
+        "caption": (
+            "Nobody times the bottom.\n\n"
+            "The suburb you can afford today is worth more than the rate cut you're waiting for.\n\n"
+            "Buy the right property. Refinance the rate later.\n\n"
+            "propreport.com.au"
+        ),
+    },
+    {
+        "id": "p17",
+        "style": "light_statement",
+        "tag": "Try This",
+        "headline": "A new kitchen sells the house.\nIt rarely returns its cost at resale.",
+        "caption": (
+            "Cosmetic renovations sell to emotion.\n\n"
+            "Structural fixes protect value.\n\n"
+            "Know which one you're actually paying for.\n\n"
+            "propreport.com.au"
+        ),
+    },
+    {
+        "id": "p18",
+        "style": "stat",
+        "tag": None,
+        "big_number": "70%",
+        "sub_line": "of a property's long-term value sits in the land, not the build.",
+        "dark_bg": False,
+        "caption": (
+            "Buildings depreciate.\n\n"
+            "Land — in the right suburb — doesn't.\n\n"
+            "Check the land-to-asset ratio before you fall for the finishes.\n\n"
+            "propreport.com.au"
+        ),
+    },
+    {
+        "id": "p19",
+        "style": "dark_statement",
+        "tag": "Risk Check",
+        "headline": "The body corporate fee is a mortgage\nyou didn't know you signed up for.",
+        "caption": (
+            "$150 a month feels small on the listing.\n\n"
+            "Over a 30-year loan it's tens of thousands.\n\n"
+            "Check the strata report, not just the price.\n\n"
+            "propreport.com.au"
+        ),
+    },
+    {
+        "id": "p20",
+        "style": "light_statement",
+        "tag": "Property Truths",
+        "headline": "Falling in love at the open home\nis how you overpay at the auction.",
+        "caption": (
+            "Auctions are built to move fast on emotion.\n\n"
+            "The suburb data doesn't move at all.\n\n"
+            "Know your ceiling before you walk in.\n\n"
+            "propreport.com.au"
+        ),
+    },
+    {
+        "id": "p21",
+        "style": "stat",
+        "tag": None,
+        "big_number": "+2.1%",
+        "sub_line": "annual population growth is a better price predictor than last year's headlines.",
+        "dark_bg": True,
+        "caption": (
+            "Prices follow people.\n\n"
+            "Population growth shows you where demand is heading before the headlines catch up.\n\n"
+            "propreport.com.au"
+        ),
+    },
+    {
+        "id": "p22",
+        "style": "dark_statement",
+        "tag": "Risk Check",
+        "headline": "The valuation at settlement\ncan be lower than the price you signed for.",
+        "caption": (
+            "Off-the-plan locks in today's price for a property built years from now.\n\n"
+            "The market — and the bank's valuer — might disagree by settlement.\n\n"
+            "Know the gap before you sign.\n\n"
+            "propreport.com.au"
+        ),
+    },
 ]
