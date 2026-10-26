@@ -21,7 +21,6 @@ BG_LIGHT = (247, 246, 242)
 TEXT_DARK = (26, 25, 22)
 BG_DARK = (23, 22, 20)
 TEXT_LIGHT = (247, 246, 242)
-MUTED = (122, 121, 116)
 
 
 def font(name, size):
@@ -73,14 +72,6 @@ def measure_wrapped_height(text, fnt, max_width):
     return draw_wrapped(td, text, (0, 0), fnt, (0, 0, 0), max_width)
 
 
-def brand_tag(draw, dark_bg=False):
-    color = TEXT_LIGHT if dark_bg else TEXT_DARK
-    f_small = font("Inter-SemiBold.ttf", 26)
-    draw.text((72, H - 100), "PROPREPORT", font=f_small, fill=color)
-    f_tiny = font("Inter-Regular.ttf", 24)
-    draw.text((72, H - 64), "Practical notes for Australian buyers", font=f_tiny, fill=MUTED)
-
-
 def render_statement(headline, filename, tag=None, dark_bg=True):
     bg = BG_DARK if dark_bg else BG_LIGHT
     fg = TEXT_LIGHT if dark_bg else TEXT_DARK
@@ -102,7 +93,6 @@ def render_statement(headline, filename, tag=None, dark_bg=True):
         f_tag = font("Inter-SemiBold.ttf", 28)
         d.text((72, start_y - 70), tag.upper(), font=f_tag, fill=tag_color)
 
-    brand_tag(d, dark_bg=dark_bg)
     img.save(filename, format="JPEG", quality=92)
 
 
@@ -135,7 +125,6 @@ def render_stat(big_number, sub_line, filename, dark_bg=True):
     d.text((72, start_y - num_ink_top), big_number, font=f_num, fill=fg)
     draw_wrapped(d, sub_line, (72, start_y + num_ink_h + gap), f_sub, sub_color, max_w)
 
-    brand_tag(d, dark_bg=dark_bg)
     img.save(filename, format="JPEG", quality=92)
 
 

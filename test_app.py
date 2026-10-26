@@ -121,7 +121,8 @@ class AppSafetyTests(unittest.TestCase):
                 thread.join(timeout=2)
 
         self.assertEqual(errors, [])
-        self.assertEqual({result["posted"] for result in results}, {"ab01", "ab02"})
+        expected_ids = {post["id"] for post in app.POSTS[:2]}
+        self.assertEqual({result["posted"] for result in results}, expected_ids)
         self.assertEqual(app.load_rotation_state()["next_index"], 2)
 
     def test_retired_content_version_restarts_rotation(self):

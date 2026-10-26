@@ -38,7 +38,7 @@ scheduler.
 | Inspect queue | `GET /status` | `app.py:status` | Reports remaining posts, estimated runway, and alert flags. |
 | Content queue | `POSTS` | `content_library.py` | Ordered list; the list index is the queue position. Current library: 24 posts. |
 | Card rendering | `render_post` | `render.py` | Produces 1080×1350 RGB JPEGs in `generated/`. |
-| Dark/light statement cards | `dark_statement`, `light_statement` | `render.py:render_statement` | Optional tag plus wrapped headline and brand footer. |
+| Dark/light statement cards | `dark_statement`, `light_statement` | `render.py:render_statement` | Optional tag plus wrapped headline; cards have no footer. |
 | Statistic cards | `stat` | `render.py:render_stat` | Large number, supporting line, configurable light/dark background. |
 | Rotation persistence | `rotation_state.json` | `load_rotation_state`, `save_rotation_state` | Atomic state file on the attached Railway Volume or configured `STATE_DIR`. |
 | Low-content alerts | SMTP environment variables | `_maybe_send_low_content_alert`, `send_alert_email` | Threshold derives from posts per week and alert days. |
@@ -95,8 +95,10 @@ not change it when merely appending posts.
   product pitch, engagement request or promotional call to action.
 - Give the reader a usable checklist, calculation, question, or research step
   in every caption.
-- Write for Australian buyers and name Australian concepts such as strata,
-  council planning controls, bushfire risk and conveyancing where relevant.
+- Write for Melbourne buyers and use Victorian concepts such as the Property
+  Price Statement, Section 32, owners corporations, auctions and VicPlan.
+- Use concise hooks, local buyer situations and practical decision rules. Keep
+  the language original rather than imitating any individual creator.
 - Prefer official maps, government guidance and address-specific checks over
   broad market rules.
 - Avoid universal price predictions and unsupported fixed percentages. If a
@@ -114,7 +116,7 @@ not change it when merely appending posts.
 {
   "next_index": 7,
   "alerted": ["low_content"],
-  "content_version": "australian_buyer_education_v1_2026_10",
+  "content_version": "melbourne_buyer_field_notes_v2_2026_10",
   "updated_at": 1730000000.0
 }
 ```

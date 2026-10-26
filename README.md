@@ -179,7 +179,7 @@ https://<your-railway-domain>/run?secret=<your RUN_SECRET>
 If it works, you'll get a JSON response like:
 
 ```json
-{"success": true, "posted": "ab01", "media_id": "...", "image_url": "...", "next_index": 1}
+{"success": true, "posted": "mb01", "media_id": "...", "image_url": "...", "next_index": 1}
 ```
 
 And the post will appear on your Instagram account within a few seconds.
@@ -263,7 +263,7 @@ restart the queue at index 0 with cleared alert flags.
 
 ## Content rotation & running low on content
 
-Posts are published in order (`ab01`, `ab02`, ... in whatever order they appear
+Posts are published in order (`mb01`, `mb02`, ... in whatever order they appear
 in `POSTS`) and progress is tracked in `rotation_state.json` (auto-created on
 the attached Railway Volume). Unlike earlier versions of this app,
 **rotation does NOT loop back to the start** once it reaches the end.
@@ -278,7 +278,7 @@ the attached Railway Volume). Unlike earlier versions of this app,
   `{"success": true, "out_of_content": true, ...}` instead of an error. You
   also get a second, separate "out of content" email (if alerts are
   configured). Every subsequent `/run` call is a safe no-op until you add
-  more content — it won't loop back to `ab01` or throw errors.
+  more content — it won't loop back to `mb01` or throw errors.
 - Check `GET /status?secret=<RUN_SECRET>` any time to see posts remaining,
   an estimated days-remaining figure, and which alerts have already fired —
   without posting anything.
