@@ -1,287 +1,315 @@
-"""
-PropReport Instagram content library.
-Each entry: id, style (dark_statement | light_statement | stat), headline/number/sub, tag, caption.
-Educational/value-led, Dan Koe voice: short, declarative, principle-driven, quiet CTA.
+"""PropReport Instagram content library.
 
-Add new posts to this list to expand the rotation. The pipeline cycles through
-them in order and stops when it reaches the end.
+Original, CTA-free education for Australian property buyers. The series uses
+concise principles, contrarian reframes, practical frameworks, checklists and
+buyer scenarios without copying any individual creator's language.
+
+Increment CONTENT_VERSION whenever the whole library is replaced. The posting
+agent uses it to begin the new series at its first post instead of carrying an
+index across from a retired library.
 """
+
+CONTENT_VERSION = "australian_buyer_education_v1_2026_10"
+
 
 POSTS = [
     {
-        "id": "p01",
+        "id": "ab01",
         "style": "dark_statement",
-        "tag": "Property Truths",
-        "headline": "Most buyers research the house.\nFew research the suburb.",
+        "tag": "Buyer Principle",
+        "headline": "The listing is marketing.\nThe contract is the product.",
         "caption": (
-            "Most people spend weeks comparing kitchens.\n\n"
-            "Zero minutes comparing flood maps, crime stats, and school catchments.\n\n"
-            "The house is temporary. The suburb is permanent.\n\n"
-            "Know both before you offer.\n\n"
-            "propreport.com.au"
+            "Photos show presentation. The contract and supporting reports show obligations.\n\n"
+            "A buyer's useful reading stack is:\n\n"
+            "• The contract and title documents\n"
+            "• Planning and hazard information\n"
+            "• Building, pest or strata reports\n"
+            "• Comparable settled sales\n\n"
+            "The strongest decisions use all four, not the brochure alone."
         ),
     },
     {
-        "id": "p02",
+        "id": "ab02",
         "style": "light_statement",
-        "tag": "Property Truths",
-        "headline": "The comparable sales matter more\nthan the listing photos.",
+        "tag": "Money Rule",
+        "headline": "Borrowing capacity is the lender's risk limit.\nIt is not your living budget.",
         "caption": (
-            "Anyone can stage a listing.\n\n"
-            "Nobody can stage a suburb's last 12 months of actual sales.\n\n"
-            "That's the number that sets your ceiling.\n\n"
-            "propreport.com.au"
+            "A lender assesses whether a loan meets its rules. Only you can decide whether the repayments fit your life.\n\n"
+            "Build a personal limit using the mortgage payment plus council rates, insurance, strata where relevant, maintenance and a rate buffer.\n\n"
+            "Approval answers “can the bank lend it?” Affordability answers “can I live with it?”"
         ),
     },
     {
-        "id": "p03",
+        "id": "ab03",
         "style": "stat",
         "tag": None,
-        "big_number": "5km",
-        "sub_line": "is the radius that decides your school catchment\u2014and your resale value.",
-        "dark_bg": True,
-        "caption": (
-            "5km decides your school catchment.\n\n"
-            "It also decides your resale value in 10 years.\n\n"
-            "Most buyers never check it.\n\n"
-            "propreport.com.au"
-        ),
-    },
-    {
-        "id": "p04",
-        "style": "light_statement",
-        "tag": "Risk Check",
-        "headline": "Flood zones don't show up\non a real estate listing.\nThey show up on your insurance bill.",
-        "caption": (
-            "A real estate listing sells you a feeling.\n\n"
-            "A flood overlay tells you the truth.\n\n"
-            "Check both before you sign.\n\n"
-            "propreport.com.au"
-        ),
-    },
-    {
-        "id": "p05",
-        "style": "dark_statement",
-        "tag": "Try This",
-        "headline": "You can inspect a house in 20 minutes.\nA suburb takes hours of research.\n\nUnless you automate it.",
-        "caption": (
-            "You can inspect a house in 20 minutes.\n\n"
-            "A suburb takes hours of research most buyers never do.\n\n"
-            "Unless you automate it.\n\n"
-            "Get a full property report in minutes \u2014 propreport.com.au"
-        ),
-    },
-    {
-        "id": "p06",
-        "style": "stat",
-        "tag": None,
-        "big_number": "$9.99",
-        "sub_line": "is cheaper than one bad property decision.",
+        "big_number": "3 prices",
+        "sub_line": "exist before every offer — and only one belongs to you.",
         "dark_bg": False,
         "caption": (
-            "A building inspection costs hundreds.\n\n"
-            "A conveyancer costs thousands.\n\n"
-            "Knowing which suburb to even look in costs $9.99.\n\n"
-            "propreport.com.au"
+            "Every negotiation contains three prices:\n\n"
+            "1. The seller's asking price\n"
+            "2. The market evidence from comparable sales\n"
+            "3. Your walk-away price\n\n"
+            "The first starts the conversation. The second informs it. The third protects your future budget."
         ),
     },
     {
-        "id": "p07",
-        "style": "light_statement",
-        "tag": "Property Truths",
-        "headline": "Days on market tells you\nmore than the asking price.",
-        "caption": (
-            "A high asking price means nothing.\n\n"
-            "A property sitting for 90 days tells you the market already said no.\n\n"
-            "Read the signal, not the sign.\n\n"
-            "propreport.com.au"
-        ),
-    },
-    {
-        "id": "p08",
+        "id": "ab04",
         "style": "dark_statement",
-        "tag": "Infrastructure",
-        "headline": "A rail extension announced today\nis a price rise in three years.",
+        "tag": "Total Cost",
+        "headline": "A cheaper property with expensive risks\nisn't always cheaper.",
         "caption": (
-            "Infrastructure moves before prices do.\n\n"
-            "Rail lines. Road upgrades. Rezoning.\n\n"
-            "The buyers who check council plans get there first.\n\n"
-            "propreport.com.au"
+            "Purchase price is one line in the cost of ownership.\n\n"
+            "Add insurance, strata levies, likely repairs, energy use, commuting and any work needed before move-in.\n\n"
+            "Two homes with the same price can create very different monthly lives."
         ),
     },
     {
-        "id": "p09",
+        "id": "ab05",
         "style": "light_statement",
-        "tag": "Property Truths",
-        "headline": "Auction clearance rate is a\nsuburb's mood, not its value.",
+        "tag": "Inspection",
+        "headline": "The best inspection question is:\nWhat would make me walk away?",
         "caption": (
-            "A 90% clearance rate means buyers are confident.\n\n"
-            "It doesn't mean you should be.\n\n"
-            "Confidence and value are different numbers. Check both.\n\n"
-            "propreport.com.au"
+            "A beautiful room attracts attention. A decision rule directs it.\n\n"
+            "Before the inspection, write down the non-negotiables: structural risk, noise, access, natural light, layout, repair budget or location.\n\n"
+            "A clear rejection rule prevents a polished feature from hiding a permanent compromise."
         ),
     },
     {
-        "id": "p10",
+        "id": "ab06",
         "style": "stat",
         "tag": None,
-        "big_number": "0",
-        "sub_line": "is how much personal data we store after your report is sent.",
+        "big_number": "3 visits",
+        "sub_line": "show more of an address than one scheduled open home.",
         "dark_bg": True,
         "caption": (
-            "Your email delivers the report. That's all it does.\n\n"
-            "No storing. No selling. No follow-up calls.\n\n"
-            "Property research shouldn't cost your privacy.\n\n"
-            "propreport.com.au"
+            "See the street in three different modes:\n\n"
+            "• Weekday peak hour for traffic and transport\n"
+            "• Evening for parking, lighting and noise\n"
+            "• Weekend for the neighbourhood's normal rhythm\n\n"
+            "Walk the nearest block, test mobile reception and listen with the car turned off."
         ),
     },
     {
-        "id": "p11",
+        "id": "ab07",
         "style": "dark_statement",
-        "tag": "Try This",
-        "headline": "Before you fall in love with a house, check if you'd fall in love with the commute.",
+        "tag": "Auction Rule",
+        "headline": "An auction plan should fit on one line:\nBid to the limit. Then stop.",
         "caption": (
-            "Peak hour to the CBD is a number.\n\n"
-            "It's also two hours of your life, every day, for as long as you live there.\n\n"
-            "Check it before the open home, not after settlement.\n\n"
-            "propreport.com.au"
+            "The limit should already include comparable sales, finance, inspection findings and every ownership cost.\n\n"
+            "Auction conditions differ from private sales and can limit cooling-off or contract conditions. Legal and financial checks belong before bidding day.\n\n"
+            "A limit decided in a quiet room is more reliable than one invented in a loud crowd."
         ),
     },
     {
-        "id": "p12",
+        "id": "ab08",
         "style": "light_statement",
-        "tag": "Property Truths",
-        "headline": "A good school zone is worth more than a good kitchen.",
+        "tag": "Strata Check",
+        "headline": "A low strata levy can be\nunderfunding dressed as a discount.",
         "caption": (
-            "Kitchens get renovated.\n\n"
-            "School catchments don't move.\n\n"
-            "One of these is a permanent asset. Choose accordingly.\n\n"
-            "propreport.com.au"
+            "The levy matters less without context.\n\n"
+            "Read it beside the capital works fund, maintenance plan, meeting minutes, insurance, defects, legal disputes and special levies.\n\n"
+            "A well-funded building may cost more each quarter and less when major work arrives."
         ),
     },
     {
-        "id": "p13",
-        "style": "dark_statement",
-        "tag": "Property Truths",
-        "headline": "A high rental yield and high capital growth\nrarely live in the same suburb.",
-        "caption": (
-            "Investors chase yield.\n\n"
-            "Homeowners chase growth.\n\n"
-            "Few suburbs deliver both at once — know which trade-off you're making before you buy.\n\n"
-            "propreport.com.au"
-        ),
-    },
-    {
-        "id": "p14",
-        "style": "light_statement",
-        "tag": "Risk Check",
-        "headline": "No listing history means\nno comparable sales to check it against.",
-        "caption": (
-            "Off-market feels exclusive.\n\n"
-            "It also means the price was never tested by other buyers.\n\n"
-            "Run the comparables yourself before you trust the exclusivity.\n\n"
-            "propreport.com.au"
-        ),
-    },
-    {
-        "id": "p15",
+        "id": "ab09",
         "style": "stat",
         "tag": None,
-        "big_number": "1%",
-        "sub_line": "vacancy rate is the line between a landlord's market and a tenant's market.",
-        "dark_bg": True,
-        "caption": (
-            "Below 1% vacancy, tenants compete for you.\n\n"
-            "Above 3%, you compete for tenants.\n\n"
-            "Check the number before you buy for yield.\n\n"
-            "propreport.com.au"
-        ),
-    },
-    {
-        "id": "p16",
-        "style": "dark_statement",
-        "tag": "Property Truths",
-        "headline": "Waiting for the 'right' rate\nhas cost more buyers than the rate itself.",
-        "caption": (
-            "Nobody times the bottom.\n\n"
-            "The suburb you can afford today is worth more than the rate cut you're waiting for.\n\n"
-            "Buy the right property. Refinance the rate later.\n\n"
-            "propreport.com.au"
-        ),
-    },
-    {
-        "id": "p17",
-        "style": "light_statement",
-        "tag": "Try This",
-        "headline": "A new kitchen sells the house.\nIt rarely returns its cost at resale.",
-        "caption": (
-            "Cosmetic renovations sell to emotion.\n\n"
-            "Structural fixes protect value.\n\n"
-            "Know which one you're actually paying for.\n\n"
-            "propreport.com.au"
-        ),
-    },
-    {
-        "id": "p18",
-        "style": "stat",
-        "tag": None,
-        "big_number": "70%",
-        "sub_line": "of a property's long-term value sits in the land, not the build.",
+        "big_number": "+2%",
+        "sub_line": "turns a hopeful repayment estimate into a useful stress test.",
         "dark_bg": False,
         "caption": (
-            "Buildings depreciate.\n\n"
-            "Land — in the right suburb — doesn't.\n\n"
-            "Check the land-to-asset ratio before you fall for the finishes.\n\n"
-            "propreport.com.au"
+            "Run the proposed loan at the offered rate and again two percentage points higher.\n\n"
+            "Add rates, insurance, strata and maintenance to both monthly totals.\n\n"
+            "The difference is not a forecast. It is a view of how much room exists if rates or other costs move against the household."
         ),
     },
     {
-        "id": "p19",
+        "id": "ab10",
         "style": "dark_statement",
-        "tag": "Risk Check",
-        "headline": "The body corporate fee is a mortgage\nyou didn't know you signed up for.",
+        "tag": "Valuation",
+        "headline": "The more explanation a comparable needs,\nthe weaker the comparable.",
         "caption": (
-            "$150 a month feels small on the listing.\n\n"
-            "Over a 30-year loan it's tens of thousands.\n\n"
-            "Check the strata report, not just the price.\n\n"
-            "propreport.com.au"
+            "A useful comparable resembles the subject property in location, type, size, condition, features and sale date.\n\n"
+            "Adjustments are normal. A chain of excuses is not.\n\n"
+            "Three close matches usually teach more than ten distant examples selected to support a preferred price."
         ),
     },
     {
-        "id": "p20",
+        "id": "ab11",
         "style": "light_statement",
-        "tag": "Property Truths",
-        "headline": "Falling in love at the open home\nis how you overpay at the auction.",
+        "tag": "Market Signal",
+        "headline": "A changed price guide is information.\nSo is a property that passed in.",
         "caption": (
-            "Auctions are built to move fast on emotion.\n\n"
-            "The suburb data doesn't move at all.\n\n"
-            "Know your ceiling before you walk in.\n\n"
-            "propreport.com.au"
+            "Track a shortlist over several weeks and record:\n\n"
+            "• Original and revised price guides\n"
+            "• Days advertised\n"
+            "• Auction results and passed-in properties\n"
+            "• Final settled prices when available\n\n"
+            "A local watchlist shows how expectations meet reality in the market actually being considered."
         ),
     },
     {
-        "id": "p21",
+        "id": "ab12",
         "style": "stat",
         "tag": None,
-        "big_number": "+2.1%",
-        "sub_line": "annual population growth is a better price predictor than last year's headlines.",
+        "big_number": "1 quote",
+        "sub_line": "can expose an address risk before the contract does.",
         "dark_bg": True,
         "caption": (
-            "Prices follow people.\n\n"
-            "Population growth shows you where demand is heading before the headlines catch up.\n\n"
-            "propreport.com.au"
+            "Request an insurance quote for the exact address before committing.\n\n"
+            "Compare the premium, excess, exclusions and assumptions for flood, bushfire, storm and rebuild cost.\n\n"
+            "Difficulty obtaining suitable cover is information about the property, not merely an insurance problem."
         ),
     },
     {
-        "id": "p22",
+        "id": "ab13",
         "style": "dark_statement",
-        "tag": "Risk Check",
-        "headline": "The valuation at settlement\ncan be lower than the price you signed for.",
+        "tag": "Renovation Check",
+        "headline": "New finishes can sit\non top of old problems.",
         "caption": (
-            "Off-the-plan locks in today's price for a property built years from now.\n\n"
-            "The market — and the bank's valuer — might disagree by settlement.\n\n"
-            "Know the gap before you sign.\n\n"
-            "propreport.com.au"
+            "A cosmetic renovation does not automatically update the roof, drainage, waterproofing, wiring, plumbing or structure.\n\n"
+            "Check approvals and warranties. Ask what work was completed, by whom and when.\n\n"
+            "Presentation shows what changed. An inspection helps reveal what did not."
+        ),
+    },
+    {
+        "id": "ab14",
+        "style": "light_statement",
+        "tag": "School Check",
+        "headline": "A school catchment is a boundary.\nIt is not an enrolment promise.",
+        "caption": (
+            "Use the relevant state government map for the exact address, then confirm current enrolment rules with the school.\n\n"
+            "Do not rely on distance, the nearest campus or the listing description.\n\n"
+            "Boundaries and policies can change, so record the source and date of the check."
+        ),
+    },
+    {
+        "id": "ab15",
+        "style": "stat",
+        "tag": None,
+        "big_number": "5 costs",
+        "sub_line": "sit beside the deposit before a buyer receives the keys.",
+        "dark_bg": False,
+        "caption": (
+            "The deposit is not the full entry cost. Allow for:\n\n"
+            "1. Transfer duty where applicable\n"
+            "2. Conveyancing or legal work\n"
+            "3. Building, pest or strata reports\n"
+            "4. Loan and valuation costs\n"
+            "5. Insurance, moving and immediate repairs\n\n"
+            "Concessions and requirements vary by state and buyer, so the budget needs address-specific numbers."
+        ),
+    },
+    {
+        "id": "ab16",
+        "style": "dark_statement",
+        "tag": "Off-Market",
+        "headline": "Off-market means less advertising.\nIt does not automatically mean better value.",
+        "caption": (
+            "An off-market opportunity may reduce visible competition. It may also reduce price transparency.\n\n"
+            "The property still needs comparable sales, contract review, inspections and a walk-away number.\n\n"
+            "Exclusive access describes the sales process. It does not describe the asset's value."
+        ),
+    },
+    {
+        "id": "ab17",
+        "style": "light_statement",
+        "tag": "Rate Reality",
+        "headline": "A future rate cut cannot repair\na purchase that was unaffordable today.",
+        "caption": (
+            "Rate forecasts can change quickly. The purchase price and debt remain.\n\n"
+            "Affordability works best when repayments fit current income, higher-rate scenarios and the property's full ownership costs.\n\n"
+            "A favourable forecast is upside. It should not be the condition that keeps the budget alive."
+        ),
+    },
+    {
+        "id": "ab18",
+        "style": "stat",
+        "tag": None,
+        "big_number": "10 min",
+        "sub_line": "on a council planning portal can change an inspection shortlist.",
+        "dark_bg": True,
+        "caption": (
+            "A first planning check can cover:\n\n"
+            "• Zoning and overlays\n"
+            "• Nearby applications and approvals\n"
+            "• Heritage or development controls\n"
+            "• Proposed roads and infrastructure\n\n"
+            "What may be built nearby can affect light, privacy, noise, traffic and future use of the property."
+        ),
+    },
+    {
+        "id": "ab19",
+        "style": "dark_statement",
+        "tag": "Risk Rule",
+        "headline": "A known defect is a cost.\nAn uninspected defect is uncertainty.",
+        "caption": (
+            "A report does not make a defect disappear. It turns uncertainty into something that can be investigated, priced and negotiated.\n\n"
+            "Read the report's scope and exclusions, not only the summary. Specialist follow-up may be needed for structural, electrical, plumbing or moisture concerns.\n\n"
+            "Known problems can enter a budget. Unknown problems cannot."
+        ),
+    },
+    {
+        "id": "ab20",
+        "style": "light_statement",
+        "tag": "Micro Location",
+        "headline": "Good suburb data cannot rescue\na bad position within the suburb.",
+        "caption": (
+            "Suburb averages hide street-level differences.\n\n"
+            "Check traffic, slope, aircraft or rail noise, nearby commercial uses, parking, orientation, flood flow paths and the quality of surrounding properties.\n\n"
+            "The suburb narrows the search. The street and block decide the daily experience."
+        ),
+    },
+    {
+        "id": "ab21",
+        "style": "stat",
+        "tag": None,
+        "big_number": "2 checks",
+        "sub_line": "matter twice when buying off the plan: contract day and settlement day.",
+        "dark_bg": False,
+        "caption": (
+            "Off-the-plan buyers face two different moments:\n\n"
+            "At contract: review sunset clauses, variations, finishes, dimensions and developer obligations.\n\n"
+            "Before settlement: inspect the completed property, confirm defects and prepare for the lender's final valuation.\n\n"
+            "Time passing between those moments creates risk as well as opportunity."
+        ),
+    },
+    {
+        "id": "ab22",
+        "style": "dark_statement",
+        "tag": "Negotiation",
+        "headline": "Negotiation starts before the offer.\nEvidence creates patience.",
+        "caption": (
+            "A prepared buyer knows the comparable range, repair allowance, preferred conditions and walk-away number before speaking about price.\n\n"
+            "That preparation makes silence easier and counteroffers less emotional.\n\n"
+            "Negotiation is rarely one clever sentence. It is the ability to wait without abandoning the numbers."
+        ),
+    },
+    {
+        "id": "ab23",
+        "style": "light_statement",
+        "tag": "Local Market",
+        "headline": "Market headlines describe Australia.\nYou are buying one property.",
+        "caption": (
+            "National and capital-city trends provide context. The decision still depends on one property in one local market.\n\n"
+            "Track nearby stock, comparable settled sales, vendor discounting, days on market and auction outcomes where relevant.\n\n"
+            "Broad data sets the weather. Local evidence tells you whether to carry an umbrella."
+        ),
+    },
+    {
+        "id": "ab24",
+        "style": "stat",
+        "tag": None,
+        "big_number": "1 plan",
+        "sub_line": "should still work when the market forecast is wrong.",
+        "dark_bg": True,
+        "caption": (
+            "A resilient purchase plan allows for an imperfect forecast.\n\n"
+            "It includes affordable repayments, a cash buffer, realistic ownership costs, suitable insurance and enough time to hold through weaker conditions.\n\n"
+            "The goal is not perfect prediction. It is avoiding a decision that requires perfect prediction to survive."
         ),
     },
 ]

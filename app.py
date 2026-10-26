@@ -62,7 +62,7 @@ Optional environment variables (content rotation + low-content email alerts):
                            hosts. Railway uses RAILWAY_VOLUME_MOUNT_PATH from
                            an attached Volume automatically.
 
-Rotation behavior: posts are published in order (p01, p02, ...) and do NOT
+Rotation behavior: posts are published in library order and do NOT
 loop back to the start. Once the last post has been published, /run returns
 an "out of content" response and does not post anything until you add more
 entries to content_library.py. An email alert (if ALERT_EMAIL_TO is set) is
@@ -90,7 +90,7 @@ from email.mime.text import MIMEText
 from flask import Flask, send_from_directory, jsonify, request
 import requests
 
-from content_library import POSTS
+from content_library import CONTENT_VERSION, POSTS
 from render import render_post
 
 app = Flask(__name__)
@@ -244,9 +244,8 @@ def rotation_lock():
 
 
 def load_rotation_state():
-    """Returns a dict with next_index (int) and alerted (list of alert names
-    already sent, so we don't email the same alert every run)."""
-    default = {"next_index": 0, "alerted": []}
+    """Load the persisted queue position, alert flags and content version."""
+    default = {"next_index": 0, "alerted": [], "content_version": CONTENT_VERSION}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
@@ -263,14 +262,37 @@ def load_rotation_state():
             raise RuntimeError("Invalid rotation state: next_index must be a non-negative integer")
         if not isinstance(alerted, list) or not all(isinstance(item, str) for item in alerted):
             raise RuntimeError("Invalid rotation state: alerted must be a list of strings")
-        return {"next_index": next_index, "alerted": alerted}
+        content_version = data.get("content_version")
+        if content_version is not None and not isinstance(content_version, str):
+            raise RuntimeError("Invalid rotation state: content_version must be a string")
+        return {
+            "next_index": next_index,
+            "alerted": alerted,
+            "content_version": content_version,
+        }
     return default
+
+
+def state_for_current_content(state):
+    """Reset position and alert flags when the entire content series changes."""
+    if state.get("content_version") == CONTENT_VERSION:
+        return state, False
+    return {
+        "next_index": 0,
+        "alerted": [],
+        "content_version": CONTENT_VERSION,
+    }, True
 
 
 def save_rotation_state(idx, alerted):
     """Atomically replace the state file so readers never see partial JSON."""
     os.makedirs(STATE_DIR, exist_ok=True)
-    payload = {"next_index": idx, "alerted": alerted, "updated_at": time.time()}
+    payload = {
+        "next_index": idx,
+        "alerted": alerted,
+        "content_version": CONTENT_VERSION,
+        "updated_at": time.time(),
+    }
     descriptor, temp_path = tempfile.mkstemp(
         dir=STATE_DIR,
         prefix=".rotation_state.",
@@ -503,7 +525,9 @@ def _do_run_locked():
     ig_user_id = os.environ["IG_BUSINESS_ACCOUNT_ID"]
     public_base_url = os.environ["PUBLIC_BASE_URL"].rstrip("/")
 
-    state = load_rotation_state()
+    state, content_reset = state_for_current_content(load_rotation_state())
+    if content_reset:
+        logger.info("Content version changed; restarting rotation at index 0")
     idx = state["next_index"]
 
     if idx >= len(POSTS):
@@ -613,7 +637,7 @@ def status():
     if auth_error is not None:
         return auth_error
 
-    state = load_rotation_state()
+    state, content_reset = state_for_current_content(load_rotation_state())
     idx = state["next_index"]
     remaining = max(len(POSTS) - idx, 0)
     days_left = remaining / POSTS_PER_DAY if POSTS_PER_DAY > 0 else None
@@ -627,6 +651,8 @@ def status():
         "low_content_alert_days": LOW_CONTENT_ALERT_DAYS,
         "out_of_content": remaining == 0,
         "alerts_sent": state.get("alerted", []),
+        "content_version": CONTENT_VERSION,
+        "content_reset_pending": content_reset,
         "alert_email_configured": bool(ALERT_EMAIL_TO and SMTP_HOST and SMTP_USERNAME and SMTP_PASSWORD),
     })
 

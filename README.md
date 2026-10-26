@@ -1,8 +1,7 @@
 # PropReport Instagram Posting Agent
 
-Automatically posts Dan-Koe-style minimalist marketing graphics for
-[propreport.com.au](https://propreport.com.au) to your Instagram Business
-account, on a schedule, using Railway.
+Automatically posts minimalist, buyer-focused Australian property education
+graphics to the PropReport Instagram account on a schedule using Railway.
 
 The app is a small Flask web service with two jobs:
 
@@ -45,8 +44,8 @@ You need an Instagram **Business or Creator account** (Professional account).
    (add `instagram_business_manage_messages` / `instagram_business_manage_comments`
    only if you plan to use DMs/comments later — not required for posting).
 5. Scroll to the **Generate access tokens** section on that same page and
-   click **Add account**. Log in with the Instagram account for
-   propreport.com.au and authorize the requested permissions.
+   click **Add account**. Log in with the PropReport Instagram account and
+   authorize the requested permissions.
 6. Generate the token. It will start with `IGAA...` — this is an
    **Instagram User access token**, valid for **60 days**.
 7. On the same page, note the **Instagram User ID** shown next to your
@@ -180,7 +179,7 @@ https://<your-railway-domain>/run?secret=<your RUN_SECRET>
 If it works, you'll get a JSON response like:
 
 ```json
-{"success": true, "posted": "p01", "media_id": "...", "image_url": "...", "next_index": 1}
+{"success": true, "posted": "ab01", "media_id": "...", "image_url": "...", "next_index": 1}
 ```
 
 And the post will appear on your Instagram account within a few seconds.
@@ -226,8 +225,8 @@ is any free external scheduler (e.g. [cron-job.org](https://cron-job.org)) set
 to hit your `/run?secret=...` URL once a day — the app doesn't care who calls
 it, only that the secret matches.
 
-**Note on content runway at daily cadence:** with 22 posts in
-`content_library.py` and daily posting, the full library lasts 22 days
+**Note on content runway at daily cadence:** with 24 posts in
+`content_library.py` and daily posting, the full library lasts 24 days
 before rotation stops (see "Content rotation & running low on content"
 below). Add more posts well before then, or expect (and welcome) the
 low-content email alert as your cue to top up the queue.
@@ -258,10 +257,13 @@ supported styles:
 - `stat` — a large number/figure with a supporting line underneath.
 
 Each entry needs a unique `id` and a `caption` (the Instagram caption text).
+Appending posts does not require changing `CONTENT_VERSION`. When replacing
+the entire series, change `CONTENT_VERSION`; the next run will intentionally
+restart the queue at index 0 with cleared alert flags.
 
 ## Content rotation & running low on content
 
-Posts are published in order (`p01`, `p02`, ... in whatever order they appear
+Posts are published in order (`ab01`, `ab02`, ... in whatever order they appear
 in `POSTS`) and progress is tracked in `rotation_state.json` (auto-created on
 the attached Railway Volume). Unlike earlier versions of this app,
 **rotation does NOT loop back to the start** once it reaches the end.
@@ -276,7 +278,7 @@ the attached Railway Volume). Unlike earlier versions of this app,
   `{"success": true, "out_of_content": true, ...}` instead of an error. You
   also get a second, separate "out of content" email (if alerts are
   configured). Every subsequent `/run` call is a safe no-op until you add
-  more content — it won't loop back to `p01` or throw errors.
+  more content — it won't loop back to `ab01` or throw errors.
 - Check `GET /status?secret=<RUN_SECRET>` any time to see posts remaining,
   an estimated days-remaining figure, and which alerts have already fired —
   without posting anything.

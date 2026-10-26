@@ -76,9 +76,9 @@ def measure_wrapped_height(text, fnt, max_width):
 def brand_tag(draw, dark_bg=False):
     color = TEXT_LIGHT if dark_bg else TEXT_DARK
     f_small = font("Inter-SemiBold.ttf", 26)
-    draw.text((72, H - 100), "PROPREPORT.COM.AU", font=f_small, fill=color)
+    draw.text((72, H - 100), "PROPREPORT", font=f_small, fill=color)
     f_tiny = font("Inter-Regular.ttf", 24)
-    draw.text((72, H - 64), "AI property reports, in minutes", font=f_tiny, fill=MUTED)
+    draw.text((72, H - 64), "Practical notes for Australian buyers", font=f_tiny, fill=MUTED)
 
 
 def render_statement(headline, filename, tag=None, dark_bg=True):

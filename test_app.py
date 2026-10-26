@@ -51,7 +51,11 @@ class AppSafetyTests(unittest.TestCase):
 
         self.assertEqual(
             app.load_rotation_state(),
-            {"next_index": 4, "alerted": ["low_content"]},
+            {
+                "next_index": 4,
+                "alerted": ["low_content"],
+                "content_version": app.CONTENT_VERSION,
+            },
         )
         leftovers = [
             name for name in os.listdir(self.temp_dir.name) if name.endswith(".tmp")
@@ -117,8 +121,22 @@ class AppSafetyTests(unittest.TestCase):
                 thread.join(timeout=2)
 
         self.assertEqual(errors, [])
-        self.assertEqual({result["posted"] for result in results}, {"p01", "p02"})
+        self.assertEqual({result["posted"] for result in results}, {"ab01", "ab02"})
         self.assertEqual(app.load_rotation_state()["next_index"], 2)
+
+    def test_retired_content_version_restarts_rotation(self):
+        legacy_state = {
+            "next_index": 19,
+            "alerted": ["low_content"],
+            "content_version": "retired-series",
+        }
+
+        current_state, reset = app.state_for_current_content(legacy_state)
+
+        self.assertTrue(reset)
+        self.assertEqual(current_state["next_index"], 0)
+        self.assertEqual(current_state["alerted"], [])
+        self.assertEqual(current_state["content_version"], app.CONTENT_VERSION)
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ scheduler.
 | Serve rendered media | `GET /images/<filename>` | `app.py:serve_image` | Public by design so Meta can fetch the image. |
 | Check credentials | `GET /debug-token` | `app.py:debug_token` | Calls Graph API without publishing or changing rotation state. |
 | Inspect queue | `GET /status` | `app.py:status` | Reports remaining posts, estimated runway, and alert flags. |
-| Content queue | `POSTS` | `content_library.py` | Ordered list; the list index is the queue position. Current library: 22 posts. |
+| Content queue | `POSTS` | `content_library.py` | Ordered list; the list index is the queue position. Current library: 24 posts. |
 | Card rendering | `render_post` | `render.py` | Produces 1080×1350 RGB JPEGs in `generated/`. |
 | Dark/light statement cards | `dark_statement`, `light_statement` | `render.py:render_statement` | Optional tag plus wrapped headline and brand footer. |
 | Statistic cards | `stat` | `render.py:render_stat` | Large number, supporting line, configurable light/dark background. |
@@ -85,6 +85,27 @@ The queue is position-based. Append new posts to preserve progress. Reordering,
 inserting, or deleting earlier entries while retaining an existing
 `next_index` can skip or repeat content.
 
+`CONTENT_VERSION` identifies a complete series. Changing it intentionally
+resets a state file from another series to index 0 with empty alert flags. Do
+not change it when merely appending posts.
+
+### Editorial direction
+
+- Keep `PROPREPORT` as the Instagram identity, without a website address,
+  product pitch, engagement request or promotional call to action.
+- Give the reader a usable checklist, calculation, question, or research step
+  in every caption.
+- Write for Australian buyers and name Australian concepts such as strata,
+  council planning controls, bushfire risk and conveyancing where relevant.
+- Prefer official maps, government guidance and address-specific checks over
+  broad market rules.
+- Avoid universal price predictions and unsupported fixed percentages. If a
+  post uses current rates or market statistics, record the source and review
+  date and expect to update it.
+- Account for state differences by directing readers to their relevant state,
+  council, lender, insurer or legal professional rather than presenting one
+  jurisdiction's process as national.
+
 ## State and alert semantics
 
 `rotation_state.json` has this shape:
@@ -93,6 +114,7 @@ inserting, or deleting earlier entries while retaining an existing
 {
   "next_index": 7,
   "alerted": ["low_content"],
+  "content_version": "australian_buyer_education_v1_2026_10",
   "updated_at": 1730000000.0
 }
 ```
@@ -188,10 +210,14 @@ is implemented.
 As of 2026-10-26:
 
 - Python compilation succeeds for `app.py`, `render.py`, `content_library.py`,
-  and `test_app.py`.
-- All 22 post IDs are unique.
-- The library contains 8 dark statements, 8 light statements, and 6 statistic
+  `test_app.py`, and `test_content_library.py`.
+- All 24 post IDs are unique.
+- The library contains 8 dark statements, 8 light statements, and 8 statistic
   cards.
-- All 22 entries render successfully as 1080×1350 RGB JPEGs.
+- All 24 entries render successfully as 1080×1350 RGB JPEGs.
 - Six automated safety tests cover fail-closed authentication, corrupt-state
   handling, atomic writes, Railway volume enforcement, and concurrent runs.
+- Three content tests enforce unique IDs, supported schemas, the retired
+  website-callout rule, and the absence of common promotional CTAs.
+- One rotation test verifies that a new `CONTENT_VERSION` restarts a retired
+  series at its first post.
