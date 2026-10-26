@@ -106,6 +106,23 @@ In the Railway project → your service → **Variables**, add:
 | `RUN_SECRET` | any random string you make up, e.g. `openssl rand -hex 16` |
 | `GRAPH_HOST` | optional — only set if using an `EAA...` Facebook-Login token instead; value `graph.facebook.com`. Leave unset for `IGAA...` tokens (defaults to `graph.instagram.com`). |
 
+### Attach persistent storage for rotation state
+
+Before enabling `/run`, attach a Railway Volume to this service. In the
+Railway project canvas, create a Volume, connect it to this service, and set
+its mount path to `/data`. Railway then supplies `RAILWAY_VOLUME_MOUNT_PATH`
+automatically, and the app stores `rotation_state.json` and its lock file on
+that volume.
+
+The app refuses to publish when it detects Railway without an attached
+volume. This prevents a deployment or restart from silently resetting the
+queue and reposting old content. If the service has already published posts,
+initialize the volume's `rotation_state.json` with the correct `next_index`
+before its first run on this version.
+
+On hosts other than Railway, set `STATE_DIR` to a persistent writable
+directory. Local development defaults to the project directory.
+
 Optional — low-content email alerts (see "Content rotation & running low on
 content" below for full behavior):
 
@@ -209,8 +226,8 @@ is any free external scheduler (e.g. [cron-job.org](https://cron-job.org)) set
 to hit your `/run?secret=...` URL once a day — the app doesn't care who calls
 it, only that the secret matches.
 
-**Note on content runway at daily cadence:** with 12 posts in
-`content_library.py` and daily posting, the full library lasts 12 days
+**Note on content runway at daily cadence:** with 22 posts in
+`content_library.py` and daily posting, the full library lasts 22 days
 before rotation stops (see "Content rotation & running low on content"
 below). Add more posts well before then, or expect (and welcome) the
 low-content email alert as your cue to top up the queue.
@@ -246,7 +263,7 @@ Each entry needs a unique `id` and a `caption` (the Instagram caption text).
 
 Posts are published in order (`p01`, `p02`, ... in whatever order they appear
 in `POSTS`) and progress is tracked in `rotation_state.json` (auto-created on
-Railway's persistent filesystem). Unlike earlier versions of this app,
+the attached Railway Volume). Unlike earlier versions of this app,
 **rotation does NOT loop back to the start** once it reaches the end.
 
 - While posts remain: `/run` renders and publishes the next post as usual.
@@ -275,7 +292,9 @@ after redeploying so `next_index` resets to 0.
 
 - Never commit `IG_ACCESS_TOKEN` or `RUN_SECRET` to the repo — they're
   Railway environment variables only.
-- The `/run` endpoint is protected by `RUN_SECRET`. Keep it private.
+- The `/run`, `/status`, and `/debug-token` endpoints are protected by
+  `RUN_SECRET`. If it is missing, they fail closed with HTTP 503. Prefer the
+  `X-Run-Secret` header over a query parameter when your scheduler supports it.
 - Long-lived Instagram tokens expire ~60 days after issue — set a reminder to
   refresh it.
 

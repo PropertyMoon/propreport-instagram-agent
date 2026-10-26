@@ -4,7 +4,7 @@ Each entry: id, style (dark_statement | light_statement | stat), headline/number
 Educational/value-led, Dan Koe voice: short, declarative, principle-driven, quiet CTA.
 
 Add new posts to this list to expand the rotation. The pipeline cycles through
-them in order and loops back to the start when it reaches the end.
+them in order and stops when it reaches the end.
 """
 
 POSTS = [

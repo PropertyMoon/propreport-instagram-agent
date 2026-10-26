@@ -58,6 +58,9 @@ Optional environment variables (content rotation + low-content email alerts):
                            Works with a Gmail app password (smtp.gmail.com,
                            port 587) or any transactional email provider's
                            SMTP endpoint. SMTP_FROM defaults to SMTP_USERNAME.
+  STATE_DIR                Persistent writable state directory on non-Railway
+                           hosts. Railway uses RAILWAY_VOLUME_MOUNT_PATH from
+                           an attached Volume automatically.
 
 Rotation behavior: posts are published in order (p01, p02, ...) and do NOT
 loop back to the start. Once the last post has been published, /run returns
@@ -73,11 +76,15 @@ Local test:
   curl "http://localhost:8080/run?secret=test"
 """
 import json
+import hmac
 import logging
 import math
 import os
 import smtplib
+import tempfile
+import threading
 import time
+from contextlib import contextmanager
 from email.mime.text import MIMEText
 
 from flask import Flask, send_from_directory, jsonify, request
@@ -91,11 +98,27 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("propreport-instagram-agent")
 
+
+class StateConfigurationError(RuntimeError):
+    """Raised when publishing cannot safely persist queue state."""
+
 BASE_DIR = os.path.dirname(__file__)
 GENERATED_DIR = os.path.join(BASE_DIR, "generated")
-STATE_FILE = os.path.join(BASE_DIR, "rotation_state.json")
+
+# Railway exposes RAILWAY_VOLUME_MOUNT_PATH automatically when a persistent
+# volume is attached. STATE_DIR is useful on other hosts and in tests. Local
+# development falls back to the project directory.
+STATE_DIR = os.path.abspath(
+    os.environ.get("STATE_DIR")
+    or os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
+    or BASE_DIR
+)
+STATE_FILE = os.path.join(STATE_DIR, "rotation_state.json")
+STATE_LOCK_FILE = os.path.join(STATE_DIR, "rotation_state.lock")
+_STATE_THREAD_LOCK = threading.Lock()
 
 os.makedirs(GENERATED_DIR, exist_ok=True)
+os.makedirs(STATE_DIR, exist_ok=True)
 
 GRAPH_API_VERSION = "v21.0"
 
@@ -158,6 +181,68 @@ def _redact_url(url, params):
     return f"{url}?{query}" if query else url
 
 
+def _authorization_error():
+    """Return a Flask error response when a protected request is unauthorized.
+
+    A missing server-side secret is a configuration failure, not permission to
+    run without authentication. This keeps all protected endpoints fail-closed.
+    """
+    expected_secret = os.environ.get("RUN_SECRET", "")
+    if not expected_secret:
+        logger.error("Protected endpoint unavailable: RUN_SECRET is not configured")
+        return jsonify({"error": "service_not_configured"}), 503
+
+    provided_secret = request.args.get("secret") or request.headers.get("X-Run-Secret", "")
+    if not hmac.compare_digest(provided_secret, expected_secret):
+        return jsonify({"error": "unauthorized"}), 401
+    return None
+
+
+def _ensure_persistent_state_for_publish():
+    """Refuse Railway publishing when no persistent volume is attached."""
+    if (
+        os.environ.get("RAILWAY_ENVIRONMENT_NAME")
+        and not os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
+    ):
+        raise StateConfigurationError(
+            "Persistent state is not configured: attach a Railway volume "
+            "before publishing"
+        )
+
+
+@contextmanager
+def rotation_lock():
+    """Serialize queue reads, publishing, and state writes across workers."""
+    os.makedirs(STATE_DIR, exist_ok=True)
+
+    # File locks alone have platform-specific same-process behavior, so retain
+    # an in-process lock as well as the cross-process operating-system lock.
+    with _STATE_THREAD_LOCK:
+        with open(STATE_LOCK_FILE, "a+b") as lock_file:
+            if os.name == "nt":
+                import msvcrt
+
+                lock_file.seek(0, os.SEEK_END)
+                if lock_file.tell() == 0:
+                    lock_file.write(b"\0")
+                    lock_file.flush()
+                lock_file.seek(0)
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+                try:
+                    yield
+                finally:
+                    lock_file.seek(0)
+                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
 def load_rotation_state():
     """Returns a dict with next_index (int) and alerted (list of alert names
     already sent, so we don't email the same alert every run)."""
@@ -166,21 +251,41 @@ def load_rotation_state():
         try:
             with open(STATE_FILE) as f:
                 data = json.load(f)
-                return {
-                    "next_index": data.get("next_index", 0),
-                    "alerted": data.get("alerted", []),
-                }
-        except (json.JSONDecodeError, OSError):
-            return default
+        except (json.JSONDecodeError, OSError) as exc:
+            raise RuntimeError(
+                f"Cannot read rotation state from {STATE_FILE}; refusing to "
+                "reset the queue automatically"
+            ) from exc
+
+        next_index = data.get("next_index", 0)
+        alerted = data.get("alerted", [])
+        if isinstance(next_index, bool) or not isinstance(next_index, int) or next_index < 0:
+            raise RuntimeError("Invalid rotation state: next_index must be a non-negative integer")
+        if not isinstance(alerted, list) or not all(isinstance(item, str) for item in alerted):
+            raise RuntimeError("Invalid rotation state: alerted must be a list of strings")
+        return {"next_index": next_index, "alerted": alerted}
     return default
 
 
 def save_rotation_state(idx, alerted):
-    with open(STATE_FILE, "w") as f:
-        json.dump(
-            {"next_index": idx, "alerted": alerted, "updated_at": time.time()},
-            f,
-        )
+    """Atomically replace the state file so readers never see partial JSON."""
+    os.makedirs(STATE_DIR, exist_ok=True)
+    payload = {"next_index": idx, "alerted": alerted, "updated_at": time.time()}
+    descriptor, temp_path = tempfile.mkstemp(
+        dir=STATE_DIR,
+        prefix=".rotation_state.",
+        suffix=".tmp",
+        text=True,
+    )
+    try:
+        with os.fdopen(descriptor, "w") as temp_file:
+            json.dump(payload, temp_file)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.replace(temp_path, STATE_FILE)
+    finally:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
 
 
 def send_alert_email(subject, body):
@@ -388,6 +493,12 @@ def _maybe_send_low_content_alert(state, remaining_after_this_post):
 
 
 def _do_run():
+    _ensure_persistent_state_for_publish()
+    with rotation_lock():
+        return _do_run_locked()
+
+
+def _do_run_locked():
     access_token = os.environ["IG_ACCESS_TOKEN"]
     ig_user_id = os.environ["IG_BUSINESS_ACCOUNT_ID"]
     public_base_url = os.environ["PUBLIC_BASE_URL"].rstrip("/")
@@ -447,14 +558,16 @@ def _do_run():
 
 @app.route("/run", methods=["GET", "POST"])
 def run():
-    expected_secret = os.environ.get("RUN_SECRET")
-    provided_secret = request.args.get("secret") or request.headers.get("X-Run-Secret")
-    if expected_secret and provided_secret != expected_secret:
-        return jsonify({"error": "unauthorized"}), 401
+    auth_error = _authorization_error()
+    if auth_error is not None:
+        return auth_error
 
     try:
         result = _do_run()
         return jsonify({"success": True, **result})
+    except StateConfigurationError as e:
+        logger.error("run() unavailable: %s", e)
+        return jsonify({"success": False, "error": str(e)}), 503
     except Exception as e:
         logger.exception("run() failed")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -466,10 +579,9 @@ def debug_token():
     without touching rotation state or posting anything. Protected by RUN_SECRET
     just like /run. Visit /debug-token?secret=... to use.
     """
-    expected_secret = os.environ.get("RUN_SECRET")
-    provided_secret = request.args.get("secret") or request.headers.get("X-Run-Secret")
-    if expected_secret and provided_secret != expected_secret:
-        return jsonify({"error": "unauthorized"}), 401
+    auth_error = _authorization_error()
+    if auth_error is not None:
+        return auth_error
 
     access_token = os.environ.get("IG_ACCESS_TOKEN", "")
     ig_user_id = os.environ.get("IG_BUSINESS_ACCOUNT_ID", "")
@@ -497,10 +609,9 @@ def status():
     alerts have fired, and current alerting config. Does not post anything.
     Protected by RUN_SECRET like /run.
     """
-    expected_secret = os.environ.get("RUN_SECRET")
-    provided_secret = request.args.get("secret") or request.headers.get("X-Run-Secret")
-    if expected_secret and provided_secret != expected_secret:
-        return jsonify({"error": "unauthorized"}), 401
+    auth_error = _authorization_error()
+    if auth_error is not None:
+        return auth_error
 
     state = load_rotation_state()
     idx = state["next_index"]

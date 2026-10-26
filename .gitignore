@@ -1,5 +1,8 @@
 __pycache__/
 *.pyc
 generated/*.png
+generated/*.jpg
 rotation_state.json
+rotation_state.lock
+.rotation_state.*.tmp
 .env
